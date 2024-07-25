@@ -51,18 +51,15 @@ export function fetchVoiceChannelData(channel) {
 
 export async function getThreadStuff(channel, options, limiter){
     const fullThreadD = [];
-    const fetchOptions = {parentId: channel.id};
-    let isDone = false;
+    //  let isDone = true;
+    //const threadCount = isNaN(options.maxThreadsPerChannel) ? 10 : options.maxThreadsPerChannel; // add future
 
-    const threadCount = isNaN(options.maxThreadsPerChannel) ? 10 : options.maxThreadsPerChannel;
-    let lasttid;
-    let isnolast;
    
     //const fetched = await limiter.schedule({ id: `getThreadStuff::channel.threads.fetch::${channel.id}` }, async () => await channel.threads.fetch(fetchOptions));
       
-//console.log(channel);
+    //console.log(channel);
 
-   // const activeThreads = await channel.threads.fetchActive();
+    // const activeThreads = await channel.threads.fetchActive();
     // Fetch archived threads
     //const archivedThreads = await channel.threads.fetchArchived();
 
@@ -70,48 +67,49 @@ export async function getThreadStuff(channel, options, limiter){
     //const allThreads = await channel.threads.fetch(fetchOptions);
 
     //console.log(allThreads)
-   // if(allThreads.length == 0) return fullThreadD;
-       // lasttid = fetched.threads.last().id;
-      // console.log(allThreads); 
+    // if(allThreads.length == 0) return fullThreadD;
+    // lasttid = fetched.threads.last().id;
+    // console.log(allThreads); 
 
-     // console.log(channel.threads.cache);
+    // console.log(channel.threads.cache);
 
-     if(channel.threads.cache.size == 0) return [];
+    if(channel.threads.cache.size == 0) return [];
 
-       await Promise.all(channel.threads.cache.map(async (thread) => {
+    await Promise.all(channel.threads.cache.map(async (thread) => {
+        // console.log("Thread Working!");
 
         if(fullThreadD.find(x => x.name == thread.name)){
             return;
         }
 
-            if (fullThreadD.length == channel.threads.cache.size) {
-                isDone = true;
-                return;
-            }
+        if (fullThreadD.length == channel.threads.cache.size) {
+            // isDone = true;
+            return;
+        }
 
-            const threadData = {
-                type: thread.type,
-                name: thread.name,
-                tags: [],
-                messages: [],
-                id: thread.id,
-                //emoji: thread.defaultReactionEmoji,
-                //sort: thread.defaultSortOrder,
-                archived: thread.archived,
-                autoArchiveDuration: thread.autoArchiveDuration,
-                locked: thread.locked,
-                rateLimitPerUser: thread.rateLimitPerUser,
+        const threadData = {
+            type: thread.type,
+            name: thread.name,
+            tags: [],
+            messages: [],
+            id: thread.id,
+            //emoji: thread.defaultReactionEmoji,
+            //sort: thread.defaultSortOrder,
+            archived: thread.archived,
+            autoArchiveDuration: thread.autoArchiveDuration,
+            locked: thread.locked,
+            rateLimitPerUser: thread.rateLimitPerUser,
          
-            };
+        };
 
-            //console.log(thread.appliedTags)
+        //console.log(thread.appliedTags)
            
-            thread.appliedTags.length > 0 ? thread.appliedTags.forEach(async (tag) => {
-               // const tagData = tag;
+        thread.appliedTags.length > 0 ? thread.appliedTags.forEach(async (tag) => {
+            // const tagData = tag;
     
-                const tagD = channel.availableTags.find(t => t.id === tag);
+            const tagD = channel.availableTags.find(t => t.id === tag);
 
-                if(tagD !== null){
+            if(tagD !== null){
 
                 const tagM = {
                     name: tagD.name,
@@ -119,19 +117,22 @@ export async function getThreadStuff(channel, options, limiter){
                     //mod: tagD.name,
                 };
 
+                // console.log(tagM);
+
                 threadData.tags.push(tagM);
-                }
-            }) : 0;
-      
-            try {
-                threadData.messages = await fetchChannelMessages(thread, options, limiter);
-            } catch {
             }
-           // console.log(threadData);
-            fullThreadD.push(threadData)
-        }))
+        }) : 0;
+      
+        try {
+            threadData.messages = await fetchChannelMessages(thread, options, limiter);
+        } catch {
+            return;
+        }
+
+        fullThreadD.push(threadData);
+    }));
     
-       // console.log(fullThreadD);
+    // console.log(fullThreadD);
     return fullThreadD;
 }
 /* fetches the messages from a channel */
@@ -150,9 +151,9 @@ export async function fetchChannelMessages(channel, options, limiter) {
         const fetched = await limiter.schedule({ id: `fetchChannelMessages::channel.messages.fetch::${channel.id}` }, () => channel.messages.fetch(fetchOptions));
         if (fetched.size == 0) break;
 
-        if(fetched.size !== 1){
+
         lastMessageId = fetched.last().id;
-        }
+        
 
         await Promise.all(fetched.map(async (message) => {
             if (!message.author || messages.length >= messageCount) {
@@ -226,29 +227,30 @@ export async function fetchTextChannelData(channel, options, limiter) {
         //slomo: channel.rateLimitPerUser
     };
 
-   if(channel.type == ChannelType.GuildForum){ 
+    if(channel.type == ChannelType.GuildForum){ 
 
-    channel.availableTags.length > 0 ? channel.availableTags.forEach(async (tag) => {
+        channel.availableTags.length > 0 ? channel.availableTags.forEach(async (tag) => {
             const tagData = {
                 emoji: tag.emoji,
                 name: tag.name,
                 moderated: tag.moderated
-            } 
+            }; 
 
             channelData.tags.push(tagData);
         }) : 0;
-   }
+    }
 
-//    const activeThreads = await channel.threads.fetchActive();
-//    // Fetch archived threads
-//    const archivedThreads = await channel.threads.fetchArchived();
+    //    const activeThreads = await channel.threads.fetchActive();
+    //    // Fetch archived threads
+    //    const archivedThreads = await channel.threads.fetchArchived();
 
-   channelData.threads = await getThreadStuff(channel, options, limiter);
+    channelData.threads = await getThreadStuff(channel, options, limiter);
 
     try {
         if(channel.type !== ChannelType.GuildForum){
-        channelData.messages = await fetchChannelMessages(channel, options, limiter);
+            channelData.messages = await fetchChannelMessages(channel, options, limiter);
         }
+        // console.log("Channel done");
         //channel.type == ChannelType.GuildForum ? console.log(channelData) : 0;
         return channelData;
     } catch {
@@ -312,11 +314,11 @@ export async function loadChannel(channelData, guild, category, options, limiter
 
     const nocomarray = [ChannelType.GuildVoice, ChannelType.GuildText];
 
-    if(!nocomarray.includes(channelData.type) && !guild.features?.includes('COMMUNITY')){
-        console.warn("Your serrver doesn't have community! Basically only voice & text only")
+    if(!nocomarray.includes(channelData.type) && !guild.features?.includes("COMMUNITY")){
+        console.warn("Your serrver doesn't have community! Basically only voice & text only");
         channelData.ftype = channelData.type;
         channelData.type == ChannelType.GuildStageVoice ? channelData.type = ChannelType.GuildVoice : 
-        channelData.type = ChannelType.GuildText;
+            channelData.type = ChannelType.GuildText;
     }
 
     const createOptions = { name: channelData.name, type: null, parent: category, ftype: null };
@@ -329,7 +331,7 @@ export async function loadChannel(channelData, guild, category, options, limiter
         createOptions.type = channelData.isNews && guild.features.includes(GuildFeature.News) ? ChannelType.GuildNews : ChannelType.GuildText;
     }
     else if (channelData.type == ChannelType.GuildForum){
-       // console.log(channelData.defaultEmoji)
+        // console.log(channelData.defaultEmoji)
         createOptions.rateLimitPerUser = channelData.rateLimitPerUser;
         createOptions.topic = channelData.topic;
         createOptions.type = ChannelType.GuildForum;
@@ -353,7 +355,7 @@ export async function loadChannel(channelData, guild, category, options, limiter
         createOptions.bitrate = bitrate;
         
         !createOptions.ftype == ChannelType.GuildStageVoice ? createOptions.userLimit = channelData.userLimit :
-        createOptions.userLimit = 99;
+            createOptions.userLimit = 99;
         createOptions.type = ChannelType.GuildVoice;
     } else if(channelData.type == ChannelType.GuildStageVoice) {
         let bitrate = channelData.bitrate;
@@ -397,53 +399,55 @@ export async function loadChannel(channelData, guild, category, options, limiter
 
     if (channelData.type == ChannelType.GuildText || channelData.type == ChannelType.GuildForum) {
         let webhook;
-        let e = []
+    
     
         // transitioningn from guild forum to text
         if(channelData.ftype == ChannelType.GuildForum){
             channel.send("# WARNING | Your server kinda has no community and we are trying to backup a forum! Don't worry, we will create threads and leave it as it is. We can not control community so its rceommanded to turn it on and load this again");
         } else {
 
-        if (channelData.messages.length > 0) {
-            webhook = await loadMessages(channel, channelData.messages);
+            if (channelData.messages.length > 0) {
+                webhook = await loadMessages(channel, channelData.messages);
+            }
         }
-    }
         
 
         if (channelData.threads.length > 0) {
-           // console.log(channelData.threads);
+            // console.log(channelData.threads);
             channelData.threads.forEach(async (threadData) => {
 
 
 
                 if(channelData.type == ChannelType.GuildForum){
-                webhook = await limiter.schedule({ id: `loadMessages::channel.createWebhook::${channel.name}` }, () => channel.createWebhook({ name: "MessagesBackup", avatar: channel.client.user.displayAvatarURL() }));
-                 if (!webhook) return;
-                let edMsg = threadData.messages[threadData.messages.length-1];
-                //console.log(edMsg);
-                edMsg.content = `This thread has been backed up by Dim | This message was from ${edMsg.username}! Here is the starting message \n \n ${threadData.messages[threadData.messages.length-1].content}`;
-                const thread = await limiter.schedule({ id: `loadChannel::channel.threads.create::${threadData.id}` }, () => channel.threads.create({ name: threadData.name, message: edMsg, autoArchiveDuration: threadData.autoArchiveDuration, archived: threadData.archived, locked: threadData.locked, rateLimitPerUser: threadData.rateLimitPerUser }));
-                let tagFD = [];
-                threadData.tags.forEach((tag) => {
-                    const tagF = channel.availableTags.find(t => t.name === tag);
+                    webhook = await limiter.schedule({ id: `loadMessages::channel.createWebhook::${channel.name+threadData.id}` }, () => channel.createWebhook({ name: "MessagesBackup", avatar: channel.client.user.displayAvatarURL() }));
+                    if (!webhook) return;
+                    let edMsg = threadData.messages[threadData.messages.length-1];
+                    //console.log(edMsg);
+                    edMsg.content = `This thread has been backed up by Dim | This message was from ${edMsg.username}! Here is the starting message \n \n ${threadData.messages[threadData.messages.length-1].content}`;
+                    const thread = await limiter.schedule({ id: `loadChannel::channel.threads.create::${threadData.id}` }, () => channel.threads.create({ name: threadData.name, message: edMsg, autoArchiveDuration: threadData.autoArchiveDuration, archived: threadData.archived, locked: threadData.locked, rateLimitPerUser: threadData.rateLimitPerUser }));
+                    let tagFD = [];
+                    threadData.tags.forEach((tag) => {
+                        //console.log(channel.availableTags);
+                        const tagF = channel.availableTags.find(t => t.name === tag.name);
 
-                    //console.log(tagF);
-                    if(typeof tagF !== "undefined"){
-                        tagFD.push(tagF.id);
-                    } // cant find the original or the original wasn't created 
-                    else {
-                        console.warn("bad news, can't set it as the original TAG wasn't found (We have to get the old tag id for us to get the name, blame discord :( ) You may have to set it");
-                    }
-                })
-                await thread.setAppliedTags(tagFD);
-                await loadMessages(thread, threadData.messages, webhook);
-               } else {
-                webhook = await limiter.schedule({ id: `loadMessages::channel.createWebhook::${channel.name}` }, () => channel.createWebhook({ name: "MessagesBackup", avatar: channel.client.user.displayAvatarURL() }));
-                let edMsg = threadData.messages[threadData.messages.length-1];
-                //console.log(edMsg);
-                edMsg.content = `This thread has been backed up by Dim | This message was from ${edMsg.username}! Here is the starting message \n \n ${threadData.messages[threadData.messages.length-1].content}`;
-                const thread = await limiter.schedule({ id: `loadChannel::channel.threads.create::${threadData.id}` }, () => channel.threads.create({ name: threadData.name, message: edMsg, autoArchiveDuration: threadData.autoArchiveDuration, archived: threadData.archived, locked: threadData.locked, rateLimitPerUser: threadData.rateLimitPerUser }));
-                if (webhook) await loadMessages(thread, threadData.messages, webhook);}
+                        //console.log(tagF);
+                        if(typeof tagF !== "undefined"){
+                            tagFD.push(tagF.id);
+                        } // cant find the original or the original wasn't created 
+                        else {
+                            console.warn("bad news, can't set it as the original TAG wasn't found (We have to get the old tag id for us to get the name, blame discord :( ) You may have to set it");
+                        }
+                    });
+                    //console.log(tagFD);
+                    await thread.setAppliedTags(tagFD);
+                    await loadMessages(thread, threadData.messages, webhook);
+                } else {
+                    webhook = await limiter.schedule({ id: `loadMessages::channel.createWebhook::${channel.name+threadData.id}` }, () => channel.createWebhook({ name: "MessagesBackup", avatar: channel.client.user.displayAvatarURL() }));
+                    let edMsg = threadData.messages[threadData.messages.length-1];
+                    //console.log(edMsg);
+                    edMsg.content = `This thread has been backed up by Dim | This message was from ${edMsg.username}! Here is the starting message \n \n ${threadData.messages[threadData.messages.length-1].content}`;
+                    const thread = await limiter.schedule({ id: `loadChannel::channel.threads.create::${threadData.id}` }, () => channel.threads.create({ name: threadData.name, message: edMsg, autoArchiveDuration: threadData.autoArchiveDuration, archived: threadData.archived, locked: threadData.locked, rateLimitPerUser: threadData.rateLimitPerUser }));
+                    if (webhook) await loadMessages(thread, threadData.messages, webhook);}
             });
         }
     }

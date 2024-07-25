@@ -40,3 +40,5 @@ Why does dim backup exist?
 That's all
 
 Want to visit our github page, [here](https://github.com/DimSystems/dimbackup)
+changelog:
+- bugfixes

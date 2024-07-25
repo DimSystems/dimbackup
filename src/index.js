@@ -190,6 +190,7 @@ async function createSpace(guild, spaceId,options = {}) {
         verbose: false,
         ...options
     };
+    // console.log("starting");
 
     const backup = {
         name: guild.name,
@@ -199,7 +200,7 @@ async function createSpace(guild, spaceId,options = {}) {
 
     const limiter = new Bottleneck({ minTime: options.speed, maxConcurrent: 1 });
 
-
+    // console.log("Limiter done?");
     /* if verbose is enabled, log all tasks at executing and done stages */
     if (options.verbose) {
         limiter.on("executing", (jobInfo) => {
@@ -225,12 +226,14 @@ async function createSpace(guild, spaceId,options = {}) {
         console.error(`Job Failed: ${error.message}\nID: ${jobInfo.options.id}`);
     });
     
+    ///console.log("Time to work!");
     backup.channels = await createFunctions.getChannelsSpace(guild, options, limiter, spaceId);
-    
+    //console.log("Are we done?");
     const reviver = (key, value) => typeof value == "bigint" ? value.toString() : value;
     const backupJSON = options.jsonBeautify ? JSON.stringify(backup, reviver, 4) : JSON.stringify(backup, reviver);
     // fs.writeFileSync(`${backups}${path.sep}${backup.id}.json`, backupJSON, "utf-8");
 
+    // console.log("Are we done?");
     return backupJSON;
 }
 
@@ -342,7 +345,7 @@ async function loadSpace(backup, guild, options) {
     if (!guild) throw new Error("Invalid Guild!");
 
     options = { clearGuildBeforeRestore: true, maxMessagesPerChannel: 10, speed: 250, doNotLoad: [], verbose: false, ...options };
-   // let convertedBackup = Buffer.from(backup, "ascii").toString("utf-8");
+    // let convertedBackup = Buffer.from(backup, "ascii").toString("utf-8");
     const backupData = JSON.parse(backup);
     //console.log(backup);
     if (typeof options.speed != "number") {
@@ -378,6 +381,8 @@ async function loadSpace(backup, guild, options) {
 
     // Load channels:
     await loadFunctions.loadChannelsSpace(guild, backupData, options, limiter);
+
+    // console.log("Are we done?");
 
     return backupData;
 }
