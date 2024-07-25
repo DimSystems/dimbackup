@@ -40,7 +40,7 @@ export function fetchChannelPermissions(channel) {
 /* fetches the voice channel data that is necessary for the backup */
 export function fetchVoiceChannelData(channel) {
     return {
-        type: ChannelType.GuildVoice,
+        type: channel.type,
         name: channel.name,
         bitrate: channel.bitrate,
         userLimit: channel.userLimit,
@@ -49,6 +49,91 @@ export function fetchVoiceChannelData(channel) {
     };
 }
 
+export async function getThreadStuff(channel, options, limiter){
+    const fullThreadD = [];
+    const fetchOptions = {parentId: channel.id};
+    let isDone = false;
+
+    const threadCount = isNaN(options.maxThreadsPerChannel) ? 10 : options.maxThreadsPerChannel;
+    let lasttid;
+    let isnolast;
+   
+    //const fetched = await limiter.schedule({ id: `getThreadStuff::channel.threads.fetch::${channel.id}` }, async () => await channel.threads.fetch(fetchOptions));
+      
+//console.log(channel);
+
+   // const activeThreads = await channel.threads.fetchActive();
+    // Fetch archived threads
+    //const archivedThreads = await channel.threads.fetchArchived();
+
+    // Combine active and archived threads
+    //const allThreads = await channel.threads.fetch(fetchOptions);
+
+    //console.log(allThreads)
+   // if(allThreads.length == 0) return fullThreadD;
+       // lasttid = fetched.threads.last().id;
+      // console.log(allThreads); 
+
+     // console.log(channel.threads.cache);
+
+     if(channel.threads.cache.size == 0) return [];
+
+       await Promise.all(channel.threads.cache.map(async (thread) => {
+
+        if(fullThreadD.find(x => x.name == thread.name)){
+            return;
+        }
+
+            if (fullThreadD.length == channel.threads.cache.size) {
+                isDone = true;
+                return;
+            }
+
+            const threadData = {
+                type: thread.type,
+                name: thread.name,
+                tags: [],
+                messages: [],
+                id: thread.id,
+                //emoji: thread.defaultReactionEmoji,
+                //sort: thread.defaultSortOrder,
+                archived: thread.archived,
+                autoArchiveDuration: thread.autoArchiveDuration,
+                locked: thread.locked,
+                rateLimitPerUser: thread.rateLimitPerUser,
+         
+            };
+
+            //console.log(thread.appliedTags)
+           
+            thread.appliedTags.length > 0 ? thread.appliedTags.forEach(async (tag) => {
+               // const tagData = tag;
+    
+                const tagD = channel.availableTags.find(t => t.id === tag);
+
+                if(tagD !== null){
+
+                const tagM = {
+                    name: tagD.name,
+                    emoji: tagD.emoji,
+                    //mod: tagD.name,
+                };
+
+                threadData.tags.push(tagM);
+                }
+            }) : 0;
+      
+            try {
+                threadData.messages = await fetchChannelMessages(thread, options, limiter);
+            } catch {
+            }
+           // console.log(threadData);
+            fullThreadD.push(threadData)
+        }))
+    
+       // console.log(fullThreadD);
+    return fullThreadD;
+}
 /* fetches the messages from a channel */
 export async function fetchChannelMessages(channel, options, limiter) {
     const messages = [];
@@ -65,7 +150,9 @@ export async function fetchChannelMessages(channel, options, limiter) {
         const fetched = await limiter.schedule({ id: `fetchChannelMessages::channel.messages.fetch::${channel.id}` }, () => channel.messages.fetch(fetchOptions));
         if (fetched.size == 0) break;
 
+        if(fetched.size !== 1){
         lastMessageId = fetched.last().id;
+        }
 
         await Promise.all(fetched.map(async (message) => {
             if (!message.author || messages.length >= messageCount) {
@@ -104,45 +191,65 @@ export async function fetchChannelMessages(channel, options, limiter) {
     return messages;
 }
 
+// export async function fetchForumData(channel, options, limiter){
+//     const channelData = {
+//         name: channel.name,
+//         guidelines: channel
+//         permissions: fetchChannelPermissions(channel),
+//         messages: [],
+//         topic: channel.topic,
+//         threads: [],
+    
+//     };
+
+// }
+
 /* fetches the text channel data that is necessary for the backup */
 export async function fetchTextChannelData(channel, options, limiter) {
     const channelData = {
         type: channel.type,
         name: channel.name,
         nsfw: channel.nsfw,
-        rateLimitPerUser: channel.type == ChannelType.GuildText ? channel.rateLimitPerUser : undefined,
+        rateLimitPerUser: channel.type !== ChannelType.GuildVoice || channel.type !== ChannelType.GuildStageVoice ? channel.rateLimitPerUser : undefined,
         parent: channel.parent ? channel.parent.name : null,
         topic: channel.topic,
         permissions: fetchChannelPermissions(channel),
         messages: [],
         isNews: channel.type == ChannelType.GuildNews,
         threads: [],
-    
+        tags: [],
+        defaultEmoji: channel.type == ChannelType.GuildForum ? channel.defaultReactionEmoji : "NULL",
+        autoarchived: channel.defaultAutoArchiveDuration,
+        formlayout: channel.defaultForumLayout,
+        sortorder: channel.defaultSortOrder,
+        threadslomo: channel.defaultThreadRateLimitPerUser,
+        //slomo: channel.rateLimitPerUser
     };
 
-    if (channel.threads.cache.size > 0) {
-        channel.threads.cache.forEach(async (thread) => {
-            const threadData = {
-                type: thread.type,
-                name: thread.name,
-                archived: thread.archived,
-                autoArchiveDuration: thread.autoArchiveDuration,
-                locked: thread.locked,
-                rateLimitPerUser: thread.rateLimitPerUser,
-                messages: []
-            };
+   if(channel.type == ChannelType.GuildForum){ 
 
-            try {
-                threadData.messages = await fetchChannelMessages(thread, options, limiter);
-                channelData.threads.push(threadData);
-            } catch {
-                channelData.threads.push(threadData);
-            }
-        });
-    }
+    channel.availableTags.length > 0 ? channel.availableTags.forEach(async (tag) => {
+            const tagData = {
+                emoji: tag.emoji,
+                name: tag.name,
+                moderated: tag.moderated
+            } 
+
+            channelData.tags.push(tagData);
+        }) : 0;
+   }
+
+//    const activeThreads = await channel.threads.fetchActive();
+//    // Fetch archived threads
+//    const archivedThreads = await channel.threads.fetchArchived();
+
+   channelData.threads = await getThreadStuff(channel, options, limiter);
 
     try {
+        if(channel.type !== ChannelType.GuildForum){
         channelData.messages = await fetchChannelMessages(channel, options, limiter);
+        }
+        //channel.type == ChannelType.GuildForum ? console.log(channelData) : 0;
         return channelData;
     } catch {
         return channelData;
@@ -201,15 +308,38 @@ export async function loadChannel(channelData, guild, category, options, limiter
         }
 
         return webhook;
-    };
+    }; 
 
-    const createOptions = { name: channelData.name, type: null, parent: category };
+    const nocomarray = [ChannelType.GuildVoice, ChannelType.GuildText];
+
+    if(!nocomarray.includes(channelData.type) && !guild.features?.includes('COMMUNITY')){
+        console.warn("Your serrver doesn't have community! Basically only voice & text only")
+        channelData.ftype = channelData.type;
+        channelData.type == ChannelType.GuildStageVoice ? channelData.type = ChannelType.GuildVoice : 
+        channelData.type = ChannelType.GuildText;
+    }
+
+    const createOptions = { name: channelData.name, type: null, parent: category, ftype: null };
+    //createOptions.rateLimitPerUser = channelData.slomo;
 
     if (channelData.type == ChannelType.GuildText || channelData.type == ChannelType.GuildNews) {
         createOptions.topic = channelData.topic;
         createOptions.nsfw = channelData.nsfw;
         createOptions.rateLimitPerUser = channelData.rateLimitPerUser;
         createOptions.type = channelData.isNews && guild.features.includes(GuildFeature.News) ? ChannelType.GuildNews : ChannelType.GuildText;
+    }
+    else if (channelData.type == ChannelType.GuildForum){
+       // console.log(channelData.defaultEmoji)
+        createOptions.rateLimitPerUser = channelData.rateLimitPerUser;
+        createOptions.topic = channelData.topic;
+        createOptions.type = ChannelType.GuildForum;
+        createOptions.nsfw = channelData.nsfw;
+        createOptions.defaultThreadRateLimitPerUser = channelData.threadslomo;
+        createOptions.defaultSortOrder = channelData.sortorder;
+        createOptions.defaultReactionEmoji = channelData.defaultEmoji;
+        createOptions.defaultForumLayout = channelData.formlayout;
+        createOptions.defaultAutoArchiveDuration = channelData.autoarchived;
+        createOptions.availableTags = channelData.tags;
     }
 
     else if (channelData.type == ChannelType.GuildVoice) {
@@ -221,7 +351,9 @@ export async function loadChannel(channelData, guild, category, options, limiter
         }
 
         createOptions.bitrate = bitrate;
-        createOptions.userLimit = channelData.userLimit;
+        
+        !createOptions.ftype == ChannelType.GuildStageVoice ? createOptions.userLimit = channelData.userLimit :
+        createOptions.userLimit = 99;
         createOptions.type = ChannelType.GuildVoice;
     } else if(channelData.type == ChannelType.GuildStageVoice) {
         let bitrate = channelData.bitrate;
@@ -232,9 +364,15 @@ export async function loadChannel(channelData, guild, category, options, limiter
         }
 
         createOptions.bitrate = bitrate;
+        if(channelData.userLimit > 99){
+            console.warn("Your user limit YES even on stage mode can't work, since discord doesn't allow us to make it higher, you may have to increase manually in channel settings.");
+        }
         createOptions.userLimit = 99;
         createOptions.type = ChannelType.GuildStageVoice;
     }
+
+    // add channel tag
+
 
     const channel = await limiter.schedule({ id: `loadChannel::guild.channels.create::${channelData.name}` }, () => guild.channels.create(createOptions));
     const finalPermissions = [];
@@ -252,17 +390,60 @@ export async function loadChannel(channelData, guild, category, options, limiter
 
     await limiter.schedule({ id: `loadChannel::channel.permissionOverwrites.set::${channel.name}` }, () => channel.permissionOverwrites.set(finalPermissions));
 
-    if (channelData.type == ChannelType.GuildText) {
+
+    // if(channelData.type == ChannelType.GuildForum){
+    //    // channel.setRateLimitPerUser(channelData.threadslomo);
+    // }
+
+    if (channelData.type == ChannelType.GuildText || channelData.type == ChannelType.GuildForum) {
         let webhook;
+        let e = []
+    
+        // transitioningn from guild forum to text
+        if(channelData.ftype == ChannelType.GuildForum){
+            channel.send("# WARNING | Your server kinda has no community and we are trying to backup a forum! Don't worry, we will create threads and leave it as it is. We can not control community so its rceommanded to turn it on and load this again");
+        } else {
 
         if (channelData.messages.length > 0) {
             webhook = await loadMessages(channel, channelData.messages);
         }
+    }
+        
 
         if (channelData.threads.length > 0) {
+           // console.log(channelData.threads);
             channelData.threads.forEach(async (threadData) => {
-                const thread = await limiter.schedule({ id: `loadChannel::channel.threads.create::${threadData.name}` }, () => channel.threads.create({ name: threadData.name, autoArchiveDuration: threadData.autoArchiveDuration }));
-                if (webhook) await loadMessages(thread, threadData.messages, webhook);
+
+
+
+                if(channelData.type == ChannelType.GuildForum){
+                webhook = await limiter.schedule({ id: `loadMessages::channel.createWebhook::${channel.name}` }, () => channel.createWebhook({ name: "MessagesBackup", avatar: channel.client.user.displayAvatarURL() }));
+                 if (!webhook) return;
+                let edMsg = threadData.messages[threadData.messages.length-1];
+                //console.log(edMsg);
+                edMsg.content = `This thread has been backed up by Dim | This message was from ${edMsg.username}! Here is the starting message \n \n ${threadData.messages[threadData.messages.length-1].content}`;
+                const thread = await limiter.schedule({ id: `loadChannel::channel.threads.create::${threadData.id}` }, () => channel.threads.create({ name: threadData.name, message: edMsg, autoArchiveDuration: threadData.autoArchiveDuration, archived: threadData.archived, locked: threadData.locked, rateLimitPerUser: threadData.rateLimitPerUser }));
+                let tagFD = [];
+                threadData.tags.forEach((tag) => {
+                    const tagF = channel.availableTags.find(t => t.name === tag);
+
+                    //console.log(tagF);
+                    if(typeof tagF !== "undefined"){
+                        tagFD.push(tagF.id);
+                    } // cant find the original or the original wasn't created 
+                    else {
+                        console.warn("bad news, can't set it as the original TAG wasn't found (We have to get the old tag id for us to get the name, blame discord :( ) You may have to set it");
+                    }
+                })
+                await thread.setAppliedTags(tagFD);
+                await loadMessages(thread, threadData.messages, webhook);
+               } else {
+                webhook = await limiter.schedule({ id: `loadMessages::channel.createWebhook::${channel.name}` }, () => channel.createWebhook({ name: "MessagesBackup", avatar: channel.client.user.displayAvatarURL() }));
+                let edMsg = threadData.messages[threadData.messages.length-1];
+                //console.log(edMsg);
+                edMsg.content = `This thread has been backed up by Dim | This message was from ${edMsg.username}! Here is the starting message \n \n ${threadData.messages[threadData.messages.length-1].content}`;
+                const thread = await limiter.schedule({ id: `loadChannel::channel.threads.create::${threadData.id}` }, () => channel.threads.create({ name: threadData.name, message: edMsg, autoArchiveDuration: threadData.autoArchiveDuration, archived: threadData.archived, locked: threadData.locked, rateLimitPerUser: threadData.rateLimitPerUser }));
+                if (webhook) await loadMessages(thread, threadData.messages, webhook);}
             });
         }
     }

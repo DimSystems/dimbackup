@@ -213,6 +213,7 @@ export declare interface BackupInfo {
 
 export declare function fetch(backupId: string): Promise<BackupInfo>;
 export declare function create(guild: Guild, options?: CreateOptions): Promise<BackupData>;
+export declare function clearServer(guild: Guild): void;
 export declare function createSpace(guild: Guild, spaceId: string, options?: CreateOptions): Promise<BackupData>;
 export declare function load(backup: Object, guild: Guild, options?: LoadOptions): Promise<BackupData>;
 export declare function loadSpace(backup: Object, guild: Guild, options?: LoadOptions): Promise<BackupData>;

@@ -179,7 +179,8 @@ async function createSpace(guild, spaceId,options = {}) {
 
     options = {
         backupId: null,
-        maxMessagesPerChannel: 10,
+        maxMessagesPerChannel: 500,
+        maxThreadsPerChannel: 1000,
         jsonSave: true,
         jsonBeautify: false,
         doNotBackup: [],
@@ -231,6 +232,27 @@ async function createSpace(guild, spaceId,options = {}) {
     // fs.writeFileSync(`${backups}${path.sep}${backup.id}.json`, backupJSON, "utf-8");
 
     return backupJSON;
+}
+
+async function clearServer(guild){
+    const speed = 250;
+    const limiter = new Bottleneck({ minTime: speed, maxConcurrent: 1 });
+
+    limiter.on("error", async (error) => {
+        /* ignore errors where it request entity is too large */
+        if (error.message == "Request entity too large") return;
+
+        console.error(`ERROR: ${error.message}`);
+    });
+
+    limiter.on("failed", (error, jobInfo) => {
+        /* ignore errors where it request entity is too large */
+        if (error.message == "Request entity too large") return;
+
+        console.error(`Job Failed: ${error.message}\nID: ${jobInfo.options.id}`);
+    });
+
+    await clearGuild(guild, limiter);
 }
 
 /* loads a backup for a guild */
@@ -320,9 +342,9 @@ async function loadSpace(backup, guild, options) {
     if (!guild) throw new Error("Invalid Guild!");
 
     options = { clearGuildBeforeRestore: true, maxMessagesPerChannel: 10, speed: 250, doNotLoad: [], verbose: false, ...options };
-    let convertedBackup = Buffer.from(backup, "ascii").toString("utf-8");
-    const backupData = JSON.parse(convertedBackup);
-    console.log(backup);
+   // let convertedBackup = Buffer.from(backup, "ascii").toString("utf-8");
+    const backupData = JSON.parse(backup);
+    //console.log(backup);
     if (typeof options.speed != "number") {
         throw new Error("Speed option must be a string or number");
     }
@@ -383,4 +405,4 @@ function setStorageFolder(pathname) {
     if (!fs.existsSync(backups)) fs.mkdirSync(backups);
 }
 
-export default { create, fetch, list, load, remove, setStorageFolder, loadSpace, createSpace };
+export default { create, fetch, list, load, remove, setStorageFolder, loadSpace, createSpace, clearServer };

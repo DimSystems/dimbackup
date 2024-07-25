@@ -82,11 +82,12 @@ export async function getChannels(guild, options, limiter) {
 
         for (let child of children) {
             let channelData;
-            if (child.type == ChannelType.GuildText || child.type == ChannelType.GuildAnnouncement) {
+            if (child.type == ChannelType.GuildText || child.type == ChannelType.GuildAnnouncement || child.type == ChannelType.GuildForum) {
                 channelData = await fetchTextChannelData(child, options, limiter);
-            } else if(child.type == ChannelType.GuildForum) {
+            } 
+            //else if() {
                 
-            }
+            // }
             else {
                 channelData = fetchVoiceChannelData(child);
             }
@@ -141,6 +142,7 @@ export async function getChannelsSpace(guild, options, limiter, spaceId) {
 
     for (let child of children) {
         let channelData;
+//        console.log(child)
         if (child.type == ChannelType.GuildText || child.type == ChannelType.GuildNews || child.type == ChannelType.GuildForum) {
             channelData = await fetchTextChannelData(child, options, limiter);
         } else {
